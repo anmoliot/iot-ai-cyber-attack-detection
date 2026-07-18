@@ -1,0 +1,9 @@
+[
+  "duration",
+  "protocol",
+  "src_port",
+  "dst_port",
+  "packet_count",
+  "byte_count",
+  "avg_packet_size"
+]

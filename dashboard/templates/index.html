@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Based Cyber Attack Detection</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f7fb;
+      color: #172033;
+    }
+    header {
+      background: #172033;
+      color: white;
+      padding: 24px 32px;
+    }
+    main {
+      padding: 24px 32px;
+    }
+    .stats {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: white;
+      border: 1px solid #d9e1ec;
+      border-radius: 8px;
+      padding: 16px;
+      min-width: 160px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border: 1px solid #d9e1ec;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #e8edf5;
+      text-align: left;
+      font-size: 14px;
+    }
+    th {
+      background: #eef3f9;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI Based Cyber Attack Detection</h1>
+  </header>
+  <main>
+    <section class="stats">
+      <div class="stat">
+        <strong>Total Alerts</strong>
+        <div>{{ total }}</div>
+      </div>
+      <div class="stat">
+        <strong>Attack Alerts</strong>
+        <div>{{ attack_count }}</div>
+      </div>
+    </section>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Source</th>
+          <th>Destination</th>
+          <th>Prediction</th>
+          <th>CVE</th>
+          <th>CVSS</th>
+          <th>Severity</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for alert in alerts %}
+        <tr>
+          <td>{{ alert.timestamp }}</td>
+          <td>{{ alert.src_ip }}:{{ alert.src_port }}</td>
+          <td>{{ alert.dst_ip }}:{{ alert.dst_port }}</td>
+          <td>{{ alert.prediction }}</td>
+          <td>{{ alert.cve_id }}</td>
+          <td>{{ alert.cvss_score }}</td>
+          <td>{{ alert.severity }}</td>
+          <td>{{ alert.action }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>

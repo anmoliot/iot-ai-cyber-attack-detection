@@ -1,0 +1,18 @@
+# Packet capture and network utilities
+scapy>=2.5.0
+psutil>=5.9.8
+
+# Data processing and ML inference
+numpy>=1.26.0
+pandas>=2.2.0
+scikit-learn>=1.4.0
+joblib>=1.3.2
+
+# Backend and dashboard
+flask>=3.0.0
+fastapi>=0.110.0
+uvicorn>=0.27.0
+python-dotenv>=1.0.1
+
+# Optional development and validation
+pytest>=8.0.0

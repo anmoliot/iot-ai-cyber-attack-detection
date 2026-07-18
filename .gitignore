@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+*.whl
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Environment variables (sensitive)
+.env
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
+
+# Models (large binary files - optional, uncomment if needed)
+# models/
+
+# Dataset (large files - optional, uncomment if needed)
+# dataset/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution
+*.tar.gz
+*.zip

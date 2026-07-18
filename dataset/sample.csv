@@ -1,0 +1,3 @@
+duration,protocol,src_port,dst_port,packet_count,byte_count,avg_packet_size,label
+1.20,6,51514,80,12,6840,570.00,normal
+0.40,6,44444,23,50,30000,600.00,suspicious
