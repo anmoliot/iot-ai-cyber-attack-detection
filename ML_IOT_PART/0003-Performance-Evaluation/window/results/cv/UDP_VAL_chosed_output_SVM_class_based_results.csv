@@ -1,6 +1,0 @@
-,precision,recall,f1-score,support
-Benign,1.0,1.0,1.0,2432.0
-UDP,1.0,1.0,1.0,1568.0
-accuracy,1.0,1.0,1.0,1.0
-macro avg,1.0,1.0,1.0,4000.0
-weighted avg,1.0,1.0,1.0,4000.0
