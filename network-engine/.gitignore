@@ -1,0 +1,20 @@
+### .gitignore for network-engine
+# Build output
+/target/
+*.class
+*.jar
+
+# Log files
+logs/
+*.log
+
+# IDE files
+.idea/
+*.iml
+
+# Environment files
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
