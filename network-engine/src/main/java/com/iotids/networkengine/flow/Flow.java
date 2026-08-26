@@ -1,5 +1,4 @@
-package src\main\java\com\iotids\networkengine\flow;
+package com.iotids.networkengine.flow;
 
 public class Flow {
 }
-

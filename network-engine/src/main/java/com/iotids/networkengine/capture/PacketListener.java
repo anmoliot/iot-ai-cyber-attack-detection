@@ -1,5 +1,7 @@
-package src\main\java\com\iotids\networkengine\capture;
+package com.iotids.networkengine.capture;
 
-public class PacketListener {
+import org.pcap4j.packet.Packet;
+
+public interface PacketListener {
+    void onPacket(Packet packet);
 }
-

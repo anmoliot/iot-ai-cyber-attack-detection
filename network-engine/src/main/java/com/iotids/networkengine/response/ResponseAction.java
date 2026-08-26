@@ -1,5 +1,4 @@
-package src\main\java\com\iotids\networkengine\response;
+package com.iotids.networkengine.response;
 
 public class ResponseAction {
 }
-

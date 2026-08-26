@@ -1,0 +1,58 @@
+/* Badges for tables and statuses */
+.badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.badge-info { background: rgba(0, 117, 255, 0.2); color: #0075ff; }
+.badge-warning { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+.badge-critical, .badge-high { background: rgba(238, 49, 88, 0.2); color: #ee3158; }
+.badge-low, .badge-normal { background: rgba(1, 181, 116, 0.2); color: #01b574; }
+
+/* Status dots */
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+.status-red { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
+.status-green { background: var(--success); box-shadow: 0 0 5px var(--success); }
+
+/* Buttons */
+.btn-paginate {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+.btn-paginate:hover:not(:disabled) {
+    background: var(--primary);
+}
+.btn-paginate:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Alert Items */
+.alert-item {
+    background: rgba(255,255,255,0.02);
+    border-left: 3px solid var(--primary);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.alert-item.critical, .alert-item.high { border-left-color: var(--danger); }
+.alert-item.low { border-left-color: var(--success); }
+.alert-time { font-size: 10px; color: var(--text-muted); }
+.alert-content strong { color: #fff; font-size: 13px; }
+.alert-content p { color: var(--text-muted); font-size: 12px; margin-top: 4px; }

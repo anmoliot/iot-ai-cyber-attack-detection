@@ -1,5 +1,5 @@
-package src\main\java\com\iotids\networkengine\packet;
+package com.iotids.networkengine.packet;
 
-public class ProtocolType {
+public enum ProtocolType {
+    TCP, UDP, ICMP, UNKNOWN
 }
-

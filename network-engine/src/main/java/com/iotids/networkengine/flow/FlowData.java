@@ -1,28 +1,33 @@
 package com.iotids.networkengine.flow;
 
 public class FlowData {
-    private FlowKey key;
+    private final FlowKey key;
     private int packetCount;
     private int byteCount;
-    private long durationMillis;
+    private final long startTime;
+    private long lastSeenTime;
 
-    public FlowData(FlowKey key) {
+    public FlowData(FlowKey key, long timestamp) {
         this.key = key;
+        this.startTime = timestamp;
+        this.lastSeenTime = timestamp;
+        this.packetCount = 0;
+        this.byteCount = 0;
     }
 
-    public FlowKey getKey() {
-        return key;
+    public synchronized void addPacket(int bytes, long timestamp) {
+        this.packetCount++;
+        this.byteCount += bytes;
+        this.lastSeenTime = Math.max(this.lastSeenTime, timestamp);
     }
 
-    public int getPacketCount() {
-        return packetCount;
-    }
-
-    public int getByteCount() {
-        return byteCount;
-    }
-
-    public long getDurationMillis() {
-        return durationMillis;
+    public FlowKey getKey() { return key; }
+    public synchronized int getPacketCount() { return packetCount; }
+    public synchronized int getByteCount() { return byteCount; }
+    public long getStartTime() { return startTime; }
+    public synchronized long getLastSeenTime() { return lastSeenTime; }
+    
+    public synchronized long getDurationMillis() {
+        return Math.max(0, lastSeenTime - startTime);
     }
 }

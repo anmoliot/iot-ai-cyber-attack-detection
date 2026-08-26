@@ -1,3 +1,7 @@
+@import 'components.css';
+@import 'animations.css';
+@import 'responsive.css';
+
 :root {
   --bg-main: #0a0f1d;
   --bg-card: linear-gradient(126.97deg, rgba(6, 11, 38, 0.74) 28.26%, rgba(26, 31, 55, 0.5) 91.2%);
