@@ -52,3 +52,11 @@ htmlcov/
 # Distribution
 *.tar.gz
 *.zip
+
+# Java / Maven
+backend/target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/

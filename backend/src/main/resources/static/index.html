@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SentinelAI — Security Operations Center</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="css/dashboard.css" />
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+            <span class="logo-text">SentinelAI</span>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active"><div class="nav-icon"><i class="fa-solid fa-house"></i></div> Overview</a>
+            <a href="#attack-distribution-chart" class="nav-item"><div class="nav-icon"><i class="fa-solid fa-chart-pie"></i></div> Analytics</a>
+            <a href="#attack-table-section" class="nav-item"><div class="nav-icon"><i class="fa-solid fa-table"></i></div> Recent Attacks</a>
+            <a href="#alert-panel" class="nav-item"><div class="nav-icon"><i class="fa-solid fa-bell"></i></div> Live Alerts</a>
+            
+            <div class="nav-section">ACCOUNT</div>
+            <a href="#" class="nav-item"><div class="nav-icon"><i class="fa-solid fa-user-shield"></i></div> SOC Admin</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        
+        <!-- Top Header -->
+        <header class="top-header">
+            <div class="header-brand" style="display: flex; align-items: center; gap: 12px;">
+                <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <h2 style="font-size: 18px; font-weight: 700; letter-spacing: 1px;">IoT IDS Dashboard</h2>
+            </div>
+            
+            <div class="header-actions">
+                <div class="user-actions">
+                    <span class="text-light" id="admin-name" style="margin-right: 10px;">SOC Admin</span>
+                    <form action="/logout" method="POST" style="margin: 0; padding: 0;">
+                        <button type="submit" id="logout-btn" class="action-link" style="background: transparent; border: none; cursor: pointer;">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Row (Only Original 5 Modules) -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="stat-title">Total Traffic</span>
+                    <div class="stat-value-wrap">
+                        <h3 class="stat-value" data-key="totalTraffic">0</h3>
+                    </div>
+                </div>
+                <div class="stat-icon-box"><i class="fa-solid fa-server"></i></div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="stat-title">Normal Flow</span>
+                    <div class="stat-value-wrap">
+                        <h3 class="stat-value" data-key="normalTraffic">0</h3>
+                    </div>
+                </div>
+                <div class="stat-icon-box"><i class="fa-solid fa-globe"></i></div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="stat-title">Attacks Detected</span>
+                    <div class="stat-value-wrap">
+                        <h3 class="stat-value" data-key="totalAttacks">0</h3>
+                    </div>
+                </div>
+                <div class="stat-icon-box" style="background: var(--danger);"><i class="fa-solid fa-bug"></i></div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="stat-title">Blocked Sources</span>
+                    <div class="stat-value-wrap">
+                        <h3 class="stat-value" data-key="blockedIps">0</h3>
+                    </div>
+                </div>
+                <div class="stat-icon-box" style="background: #eab308;"><i class="fa-solid fa-ban"></i></div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="stat-title">Critical Alerts</span>
+                    <div class="stat-value-wrap">
+                        <h3 class="stat-value" data-key="criticalAlerts">0</h3>
+                    </div>
+                </div>
+                <div class="stat-icon-box" style="background: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="charts-row-vision">
+            <!-- Line Chart -->
+            <div class="card">
+                <h3 class="card-title">Network Velocity Stream</h3>
+                <div class="chart-container" style="height: 300px; position: relative;">
+                    <canvas id="traffic-timeline-chart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Bar Chart -->
+            <div class="card">
+                <h3 class="card-title">Severity Matrix</h3>
+                <div class="chart-container" style="height: 300px; position: relative;">
+                    <canvas id="severity-distribution-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row 2 -->
+        <div class="charts-row-vision" style="margin-top: 24px;">
+            <div class="card">
+                <h3 class="card-title">Threat Signatures</h3>
+                <div class="chart-container" style="height: 250px; position: relative;">
+                    <canvas id="attack-distribution-chart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Protocol Distribution</h3>
+                <div class="chart-container" style="height: 250px; position: relative;">
+                    <canvas id="protocol-distribution-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: Table and Timeline -->
+        <div class="bottom-row">
+            <!-- Projects Table -->
+            <div class="projects-card card" id="attack-table-section">
+                <div class="card-header-flex">
+                    <h3 class="card-title">Recent Attacks</h3>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="vision-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Source IP</th>
+                                <th>Destination IP</th>
+                                <th>Protocol</th>
+                                <th>Type</th>
+                                <th>Severity</th>
+                                <th>Confidence</th>
+                                <th>Action</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attack-table-body">
+                            <!-- Populated via API -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="attack-pagination" style="padding-top: 15px;"></div>
+            </div>
+            
+            <!-- Orders Overview (Timeline) -->
+            <div class="orders-card card" id="alert-panel">
+                <h3 class="card-title">Real-time Alerts</h3>
+                
+                <div class="timeline" id="alert-list">
+                    <!-- Populated via WebSocket. -->
+                </div>
+            </div>
+        </div>
+        
+    </main>
+
+    <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>
