@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+scapy
+websockets
+numpy
+pydantic
