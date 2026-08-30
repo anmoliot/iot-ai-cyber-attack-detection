@@ -129,10 +129,18 @@ def _protocol_name(ip_protocol_num: float) -> str:
     return {6: "TCP", 17: "UDP", 1: "ICMP"}.get(proto, "OTHER")
 
 
-def _severity_from_score(score: float) -> str:
-    if score > 0.9:  return "critical"
-    if score > 0.7:  return "high"
-    if score > 0.5:  return "medium"
+def _severity_from_score(score: float, threshold: float) -> str:
+    """Rank an anomaly by its distance above the model's own baseline."""
+    if threshold <= 0:
+        return "critical"
+
+    ratio = score / threshold
+    if ratio >= 4.0:
+        return "critical"
+    if ratio >= 2.0:
+        return "high"
+    if ratio >= 1.25:
+        return "medium"
     return "low"
 
 
@@ -209,7 +217,8 @@ def process_packet(packet):
             is_anomaly = engine.predict_packet(features)
             if is_anomaly:
                 score      = engine.score_packet(features)
-                severity   = _severity_from_score(score)
+                threshold  = engine.get_threshold() or 0.0
+                severity   = _severity_from_score(score, threshold)
                 clf        = classify_attack(features)
 
                 alert = {
@@ -220,7 +229,7 @@ def process_packet(packet):
                     "dst_ip":            dst_ip,
                     "protocol":          _protocol_name(ip_protocol),
                     "anomaly_score":     round(score, 4),
-                    "threshold":         round(engine.get_threshold(), 4),
+                    "threshold":         round(threshold, 4),
                     "severity":          severity,
                     "attack_type":       clf.attack_type,
                     "attack_label":      clf.attack_label,
