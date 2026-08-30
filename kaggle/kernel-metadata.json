@@ -1,0 +1,13 @@
+{
+  "id": "adityabaskati/kitsune-iot-attack-trainer",
+  "title": "Kitsune IoT Attack Trainer",
+  "code_file": "kitsune_iot_attack_trainer.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "ymirsky/network-attack-dataset-kitsune"
+  ]
+}

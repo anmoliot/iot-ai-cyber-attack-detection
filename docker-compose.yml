@@ -1,0 +1,41 @@
+services:
+  backend:
+    build: ./python-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - sentinel-data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=sqlite:////app/data/sentinel.db
+      - DEMO_MODE=${DEMO_MODE:-false}
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    # Live sniffing requires host network + raw socket capabilities
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    network_mode: host
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+        VITE_WS_URL: ws://localhost:8000/ws/alerts
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  sentinel-data:

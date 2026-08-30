@@ -29,6 +29,18 @@ logs/
 
 # Models (large binary files - optional, uncomment if needed)
 # models/
+python-backend/models/
+*.joblib
+*.pkl
+*.db
+*.db-*
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+
+# Temporary notebook exports
+notebook_dump*.txt
 
 # Dataset (large files - optional, uncomment if needed)
 # dataset/

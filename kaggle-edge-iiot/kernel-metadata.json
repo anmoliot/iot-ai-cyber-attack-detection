@@ -1,0 +1,13 @@
+{
+  "id": "adityabaskati/edge-iiot-attack-trainer",
+  "title": "Edge-IIoT Attack Trainer",
+  "code_file": "edge_iiot_attack_trainer.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "sibasispradhan/edge-iiotset-dataset"
+  ]
+}
