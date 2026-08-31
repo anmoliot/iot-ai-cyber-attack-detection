@@ -90,33 +90,6 @@ export interface PersistedModelStatus {
   classes?: string[];
 }
 
-export interface DemoPredictionSample {
-  expected_label: string | number;
-  predicted_label: string | number;
-  features: Record<string, string | number | null>;
-}
-
-export interface EdgeIIoTDemoSamples {
-  dataset: string;
-  source: string;
-  binary: DemoPredictionSample[];
-  attack_type: DemoPredictionSample[];
-}
-
-export interface EdgeIIoTBinaryPrediction {
-  prediction: 'attack' | 'benign';
-  prediction_code: number;
-  attack_probability: number;
-  confidence: number;
-}
-
-export interface EdgeIIoTAttackTypePrediction {
-  prediction: 'attack' | 'benign';
-  attack_type: string;
-  confidence: number;
-  is_attack: boolean;
-}
-
 // ---------------------------------------------------------------------------
 // API Client
 // ---------------------------------------------------------------------------
@@ -151,23 +124,6 @@ export const API = {
 
   getEdgeIIoTAttackTypeModelStatus: () =>
     request<PersistedModelStatus>('/api/edge-iiot/attack-type/status'),
-
-  getEdgeIIoTDemoSamples: () =>
-    request<EdgeIIoTDemoSamples>('/api/demo/edge-iiot-samples'),
-
-  postEdgeIIoTBinaryPrediction: (features: DemoPredictionSample['features']) =>
-    request<EdgeIIoTBinaryPrediction>('/api/edge-iiot/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features }),
-    }),
-
-  postEdgeIIoTAttackTypePrediction: (features: DemoPredictionSample['features']) =>
-    request<EdgeIIoTAttackTypePrediction>('/api/edge-iiot/attack-type/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features }),
-    }),
 
   getRecentAlerts: (limit = 50, severity?: string, protocol?: string, since?: number) => {
     const params = new URLSearchParams({ limit: String(limit) });

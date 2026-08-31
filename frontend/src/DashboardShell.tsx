@@ -9,7 +9,6 @@ import { ProtocolDistribution } from './ProtocolDistribution';
 import { SeverityDonut } from './SeverityDonut';
 import { StatsSummaryBar } from './StatsSummaryBar';
 import { StatusPanel } from './StatusPanel';
-import { SupervisedModelDemo } from './SupervisedModelDemo';
 import { TopAttackers } from './TopAttackers';
 import { useAlertStream } from './useAlertStream';
 import {
@@ -156,8 +155,6 @@ export function DashboardShell() {
           <StatsSummaryBar stats={stats} uptime={status?.uptime_seconds ?? 0} />
           <StatusPanel status={status} connectionState={connectionState} />
           <ModelRegistry kitsune={kitsuneModel} edgeBinary={edgeBinaryModel} edgeAttackType={edgeAttackTypeModel} />
-          <SupervisedModelDemo />
-
           <div className="chart-row chart-row-primary">
             <AnomalyTrendChart alerts={alerts} threshold={status?.anomaly_threshold} />
             <SeverityDonut stats={stats} />
