@@ -138,6 +138,15 @@ export function AlertFeed({ alerts }: AlertFeedProps) {
                       key={alert.id}
                       className={idx < 3 ? 'animate-slide-in' : ''}
                       onClick={() => setSelectedAlert(alert)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedAlert(alert);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open details for ${alert.attack_label || 'network'} alert from ${alert.src_ip}`}
                       style={{
                         borderBottom: '1px solid var(--border-subtle)',
                         cursor: 'pointer',

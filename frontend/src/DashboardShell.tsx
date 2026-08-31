@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Activity, Network, Radar, RotateCcw, ServerCog, ShieldAlert } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Activity, AlertTriangle, Network, Play, Radar, RotateCcw, ServerCog, ShieldAlert, Square } from 'lucide-react';
 import { AlertFeed } from './AlertFeed';
 import { AnomalyTrendChart } from './AnomalyTrendChart';
 import { AttackTypeChart } from './AttackTypeChart';
@@ -34,19 +34,26 @@ export function DashboardShell() {
   const [edgeBinaryModel, setEdgeBinaryModel] = useState<PersistedModelStatus | null>(null);
   const [edgeAttackTypeModel, setEdgeAttackTypeModel] = useState<PersistedModelStatus | null>(null);
   const [isRetraining, setIsRetraining] = useState(false);
+  const [isRetrainConfirmationOpen, setIsRetrainConfirmationOpen] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [isCaptureChanging, setIsCaptureChanging] = useState(false);
+  const currentRunSince = useRef<number | null>(null);
   const { alerts, connectionState } = useAlertStream(initialAlerts);
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const [statusData, summary, attackers, protocols, atkTypes, kitsune, edgeBinary, edgeAttackType] = await Promise.all([
-        API.getStatus(),
-        API.getStatsSummary(),
-        API.getTopAttackers(10),
-        API.getProtocolDistribution(),
-        API.getAttackTypeDistribution(),
+      const statusData = await API.getStatus();
+      const since = currentRunSince.current ?? statusData.started_at;
+      currentRunSince.current = since;
+      const [summary, attackers, protocols, atkTypes, kitsune, edgeBinary, edgeAttackType, capture] = await Promise.all([
+        API.getStatsSummary(since),
+        API.getTopAttackers(10, since),
+        API.getProtocolDistribution(since),
+        API.getAttackTypeDistribution(since),
         API.getKitsuneModelStatus(),
         API.getEdgeIIoTModelStatus(),
         API.getEdgeIIoTAttackTypeModelStatus(),
+        API.getCaptureStatus(),
       ]);
       setStatus(statusData);
       setStats(summary);
@@ -56,6 +63,7 @@ export function DashboardShell() {
       setKitsuneModel(kitsune);
       setEdgeBinaryModel(edgeBinary);
       setEdgeAttackTypeModel(edgeAttackType);
+      setIsCapturing(capture.capturing);
     } catch {
       // ConnectionBanner describes the unavailable service.
     }
@@ -64,7 +72,10 @@ export function DashboardShell() {
   useEffect(() => {
     const init = async () => {
       try {
-        setInitialAlerts((await API.getRecentAlerts(100)).reverse());
+        const statusData = await API.getStatus();
+        currentRunSince.current = statusData.started_at;
+        setStatus(statusData);
+        setInitialAlerts(await API.getRecentAlerts(100, undefined, undefined, statusData.started_at));
       } catch {
         // Polling retries analytics after startup.
       }
@@ -77,12 +88,25 @@ export function DashboardShell() {
 
   const handleRetrain = async () => {
     if (isRetraining) return;
+    setIsRetrainConfirmationOpen(false);
     setIsRetraining(true);
     try {
       await API.postRetrain();
       await fetchAnalytics();
     } finally {
       setIsRetraining(false);
+    }
+  };
+
+  const handleCapture = async () => {
+    if (isCaptureChanging) return;
+    setIsCaptureChanging(true);
+    try {
+      const capture = isCapturing ? await API.stopCapture() : await API.startCapture();
+      setIsCapturing(capture.capturing);
+      await fetchAnalytics();
+    } finally {
+      setIsCaptureChanging(false);
     }
   };
 
@@ -101,7 +125,11 @@ export function DashboardShell() {
             <div className="nav-item"><ServerCog size={16} /><span>Model registry</span></div>
           </nav>
           <div className="sidebar-footer">
-            <button className="retrain-button" onClick={handleRetrain} disabled={isRetraining}>
+            <button className="retrain-button capture-button" onClick={handleCapture} disabled={isCaptureChanging}>
+              {isCapturing ? <Square size={15} /> : <Play size={15} />}
+              {isCaptureChanging ? 'Updating capture' : isCapturing ? 'Stop capture' : 'Start capture'}
+            </button>
+            <button className="retrain-button" onClick={() => setIsRetrainConfirmationOpen(true)} disabled={isRetraining}>
               <RotateCcw size={15} className={isRetraining ? 'spin' : ''} />
               {isRetraining ? 'Retraining model' : 'Retrain live model'}
             </button>
@@ -120,8 +148,8 @@ export function DashboardShell() {
             </div>
             <div className="header-status">
               <Radar size={17} />
-              <span>Sensor stream</span>
-              <strong>{connectionState === 'connected' ? 'Online' : connectionState}</strong>
+              <span>Packet capture</span>
+              <strong>{isCapturing ? 'Running' : 'Stopped'}</strong>
             </div>
           </header>
 
@@ -142,6 +170,23 @@ export function DashboardShell() {
           <AlertFeed alerts={alerts} />
         </main>
       </div>
+      {isRetrainConfirmationOpen && (
+        <div className="retrain-dialog-backdrop" role="presentation">
+          <section className="retrain-dialog" role="dialog" aria-modal="true" aria-labelledby="retrain-dialog-title">
+            <AlertTriangle size={19} aria-hidden="true" />
+            <div>
+              <h2 id="retrain-dialog-title">Retrain live anomaly model?</h2>
+              <p>This clears the live autoencoder baseline and starts a new 500-packet grace period. Saved supervised classifiers are not changed.</p>
+            </div>
+            <div className="retrain-dialog-actions">
+              <button onClick={() => setIsRetrainConfirmationOpen(false)} disabled={isRetraining}>Cancel</button>
+              <button className="confirm-retrain" onClick={handleRetrain} disabled={isRetraining}>
+                {isRetraining ? 'Retraining' : 'Clear and retrain'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

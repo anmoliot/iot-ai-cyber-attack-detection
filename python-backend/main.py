@@ -86,6 +86,7 @@ edge_iiot_model = EdgeIIoTModel(EDGE_IIOT_MODEL_PATH)
 edge_iiot_attack_type_model = EdgeIIoTAttackTypeModel(EDGE_IIOT_ATTACK_TYPE_MODEL_PATH)
 sniffer_thread: threading.Thread | None = None
 sniffer_stop_event = threading.Event()
+capture_lock = threading.Lock()
 loop: asyncio.AbstractEventLoop | None = None
 
 START_TIME   = time.time()
@@ -255,17 +256,41 @@ def process_packet(packet):
 
 
 def start_sniffer():
-    """Background thread: sniff packets indefinitely until stop event is set."""
+    """Background thread: capture packets until the operator stops capture."""
     try:
         from scapy.all import sniff
-        logger.info("Scapy sniffer starting (Grace Period active)…")
-        sniff(
-            prn=process_packet,
-            store=0,
-            stop_filter=lambda _: sniffer_stop_event.is_set(),
-        )
+        logger.info("Scapy capture started.")
+        # A bounded call lets Stop work even when no packets arrive.
+        while not sniffer_stop_event.is_set():
+            sniff(prn=process_packet, store=0, timeout=1)
+        logger.info("Scapy capture stopped.")
     except Exception as e:
         logger.error(f"Sniffer crashed: {e}")
+
+
+def _capture_running() -> bool:
+    return sniffer_thread is not None and sniffer_thread.is_alive()
+
+
+def _start_capture() -> bool:
+    """Start packet capture once. Returns False when it is already running."""
+    global sniffer_thread
+    with capture_lock:
+        if _capture_running():
+            return False
+        sniffer_stop_event.clear()
+        sniffer_thread = threading.Thread(target=start_sniffer, daemon=True)
+        sniffer_thread.start()
+        return True
+
+
+def _stop_capture() -> bool:
+    """Signal packet capture to stop. The bounded sniff loop exits within one second."""
+    with capture_lock:
+        if not _capture_running():
+            return False
+        sniffer_stop_event.set()
+        return True
 
 
 # ---------------------------------------------------------------------------
@@ -305,16 +330,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Could not load model ({e}), starting fresh.")
 
-    # Production: start live sniffer
-    sniffer_thread = threading.Thread(target=start_sniffer, daemon=True)
-    sniffer_thread.start()
-    logger.info("Live packet sniffer started.")
+    logger.info("Packet capture is idle. Start it from the dashboard when ready.")
 
     yield
 
     # Shutdown
     logger.info("Shutting down SentinelAI…")
-    sniffer_stop_event.set()
+    _stop_capture()
     if sniffer_thread and sniffer_thread.is_alive():
         sniffer_thread.join(timeout=5)
 
@@ -347,7 +369,7 @@ async def health_check():
         "status":          "healthy",
         "engine_status":   engine.get_status(),
         "uptime_seconds":  int(time.time() - START_TIME),
-        "sniffer_alive":   sniffer_thread.is_alive() if sniffer_thread else False,
+        "sniffer_alive":   _capture_running(),
         "db_ok":           db_ping(),
         "ws_clients":      len(manager.active_connections),
     }
@@ -363,9 +385,27 @@ async def get_status():
         "engine_status":    engine.get_status(),
         "anomaly_threshold": engine.get_threshold(),
         "model_version":    "2.0",
+        "started_at":       START_TIME,
         "uptime_seconds":   int(time.time() - START_TIME),
         "metadata":         engine.get_training_metadata(),
     }
+
+
+@app.get("/api/capture/status", tags=["Capture"])
+async def get_capture_status():
+    return {"capturing": _capture_running()}
+
+
+@app.post("/api/capture/start", tags=["Capture"])
+async def start_capture():
+    started = _start_capture()
+    return {"capturing": True, "status": "started" if started else "already_running"}
+
+
+@app.post("/api/capture/stop", tags=["Capture"])
+async def stop_capture():
+    stopped = _stop_capture()
+    return {"capturing": False, "status": "stopping" if stopped else "already_stopped"}
 
 
 class KitsunePredictionRequest(BaseModel):
@@ -460,11 +500,14 @@ async def get_recent_alerts(
     limit: int = 50,
     severity: str | None = None,
     protocol: str | None = None,
+    since: float | None = Query(default=None, ge=0),
 ):
     """Return most recent alerts with optional filtering. Uses DB for persistence."""
     try:
         db = SessionLocal()
         query = db.query(AlertRecord).order_by(AlertRecord.timestamp.desc())
+        if since is not None:
+            query = query.filter(AlertRecord.timestamp >= since)
         if severity:
             query = query.filter(AlertRecord.severity == severity)
         if protocol:
@@ -475,6 +518,8 @@ async def get_recent_alerts(
         # Fallback to in-memory if DB unavailable
         with alerts_lock:
             alerts = list(recent_alerts)
+        if since is not None:
+            alerts = [a for a in alerts if a["timestamp"] >= since]
         if severity:
             alerts = [a for a in alerts if a["severity"] == severity]
         return list(reversed(alerts[-limit:]))
@@ -501,17 +546,20 @@ async def websocket_endpoint(websocket: WebSocket):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/stats/summary", tags=["Analytics"])
-async def get_stats_summary():
+async def get_stats_summary(since: float | None = Query(default=None, ge=0)):
     try:
         from sqlalchemy import func
         db = SessionLocal()
-        total = db.query(func.count(AlertRecord.id)).scalar() or 0
+        records = db.query(AlertRecord)
+        if since is not None:
+            records = records.filter(AlertRecord.timestamp >= since)
+        total = records.with_entities(func.count(AlertRecord.id)).scalar() or 0
         severity_map = dict(
-            db.query(AlertRecord.severity, func.count(AlertRecord.id))
+            records.with_entities(AlertRecord.severity, func.count(AlertRecord.id))
             .group_by(AlertRecord.severity).all()
         )
-        unique_src = db.query(func.count(func.distinct(AlertRecord.src_ip))).scalar() or 0
-        unique_dst = db.query(func.count(func.distinct(AlertRecord.dst_ip))).scalar() or 0
+        unique_src = records.with_entities(func.count(func.distinct(AlertRecord.src_ip))).scalar() or 0
+        unique_dst = records.with_entities(func.count(func.distinct(AlertRecord.dst_ip))).scalar() or 0
         db.close()
         return {
             "total_alerts":  total,
@@ -526,6 +574,8 @@ async def get_stats_summary():
         # In-memory fallback
         with alerts_lock:
             alerts = list(recent_alerts)
+        if since is not None:
+            alerts = [a for a in alerts if a["timestamp"] >= since]
         sc = Counter(a["severity"] for a in alerts)
         return {
             "total_alerts":  len(alerts),
@@ -539,16 +589,19 @@ async def get_stats_summary():
 
 
 @app.get("/api/stats/top-attackers", tags=["Analytics"])
-async def get_top_attackers(limit: int = 10):
+async def get_top_attackers(limit: int = 10, since: float | None = Query(default=None, ge=0)):
     try:
         from sqlalchemy import func
         db = SessionLocal()
-        rows = (
-            db.query(
+        records = db.query(
                 AlertRecord.src_ip,
                 func.count(AlertRecord.id).label("count"),
                 func.max(AlertRecord.timestamp).label("last_seen"),
             )
+        if since is not None:
+            records = records.filter(AlertRecord.timestamp >= since)
+        rows = (
+            records
             .group_by(AlertRecord.src_ip)
             .order_by(func.count(AlertRecord.id).desc())
             .limit(limit)
@@ -559,6 +612,8 @@ async def get_top_attackers(limit: int = 10):
     except Exception:
         with alerts_lock:
             alerts = list(recent_alerts)
+        if since is not None:
+            alerts = [a for a in alerts if a["timestamp"] >= since]
         ip_counter: Counter = Counter()
         ip_last: dict = {}
         for a in alerts:
@@ -572,12 +627,15 @@ async def get_top_attackers(limit: int = 10):
 
 
 @app.get("/api/stats/protocol-distribution", tags=["Analytics"])
-async def get_protocol_distribution():
+async def get_protocol_distribution(since: float | None = Query(default=None, ge=0)):
     try:
         from sqlalchemy import func
         db = SessionLocal()
+        records = db.query(AlertRecord.protocol, func.count(AlertRecord.id))
+        if since is not None:
+            records = records.filter(AlertRecord.timestamp >= since)
         rows = dict(
-            db.query(AlertRecord.protocol, func.count(AlertRecord.id))
+            records
             .group_by(AlertRecord.protocol).all()
         )
         db.close()
@@ -590,19 +648,24 @@ async def get_protocol_distribution():
     except Exception:
         with alerts_lock:
             alerts = list(recent_alerts)
+        if since is not None:
+            alerts = [a for a in alerts if a["timestamp"] >= since]
         pc = Counter(a.get("protocol", "OTHER") for a in alerts)
         return {"TCP": pc.get("TCP", 0), "UDP": pc.get("UDP", 0),
                 "ICMP": pc.get("ICMP", 0), "OTHER": pc.get("OTHER", 0)}
 
 
 @app.get("/api/stats/attack-types", tags=["Analytics"])
-async def get_attack_type_distribution():
+async def get_attack_type_distribution(since: float | None = Query(default=None, ge=0)):
     """Distribution of classified attack types — new endpoint for dashboard."""
     try:
         from sqlalchemy import func
         db = SessionLocal()
+        records = db.query(AlertRecord.attack_type, func.count(AlertRecord.id))
+        if since is not None:
+            records = records.filter(AlertRecord.timestamp >= since)
         rows = dict(
-            db.query(AlertRecord.attack_type, func.count(AlertRecord.id))
+            records
             .group_by(AlertRecord.attack_type).all()
         )
         db.close()
@@ -610,21 +673,32 @@ async def get_attack_type_distribution():
     except Exception:
         with alerts_lock:
             alerts = list(recent_alerts)
+        if since is not None:
+            alerts = [a for a in alerts if a["timestamp"] >= since]
         ac = Counter(a.get("attack_type", "unknown") for a in alerts)
         return dict(ac)
 
 
 @app.get("/api/stats/severity-timeline", tags=["Analytics"])
-async def get_severity_timeline(bucket_minutes: int = 5):
+async def get_severity_timeline(
+    bucket_minutes: int = 5,
+    since: float | None = Query(default=None, ge=0),
+):
     with alerts_lock:
         alerts = list(recent_alerts)
+
+    if since is not None:
+        alerts = [a for a in alerts if a["timestamp"] >= since]
 
     if not alerts:
         # Try DB
         try:
             db = SessionLocal()
+            records = db.query(AlertRecord)
+            if since is not None:
+                records = records.filter(AlertRecord.timestamp >= since)
             db_alerts = (
-                db.query(AlertRecord)
+                records
                 .order_by(AlertRecord.timestamp.asc())
                 .limit(1000)
                 .all()

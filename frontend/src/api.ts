@@ -10,6 +10,7 @@ export interface EngineStatus {
   engine_status: 'UNTRAINED' | 'TRAINING' | 'READY';
   anomaly_threshold: number | null;
   model_version: string;
+  started_at: number;
   uptime_seconds: number;
 
   metadata: Record<string, unknown>;
@@ -76,6 +77,11 @@ export interface HealthStatus {
   ws_clients: number;
 }
 
+export interface CaptureStatus {
+  capturing: boolean;
+  status?: 'started' | 'already_running' | 'stopping' | 'already_stopped';
+}
+
 export interface PersistedModelStatus {
   ready: boolean;
   feature_count: number;
@@ -128,6 +134,15 @@ export const API = {
   getStatus: () =>
     request<EngineStatus>('/api/status'),
 
+  getCaptureStatus: () =>
+    request<CaptureStatus>('/api/capture/status'),
+
+  startCapture: () =>
+    request<CaptureStatus>('/api/capture/start', { method: 'POST' }),
+
+  stopCapture: () =>
+    request<CaptureStatus>('/api/capture/stop', { method: 'POST' }),
+
   getKitsuneModelStatus: () =>
     request<PersistedModelStatus>('/api/kitsune/status'),
 
@@ -154,24 +169,28 @@ export const API = {
       body: JSON.stringify({ features }),
     }),
 
-  getRecentAlerts: (limit = 50, severity?: string, protocol?: string) => {
+  getRecentAlerts: (limit = 50, severity?: string, protocol?: string, since?: number) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (severity) params.set('severity', severity);
     if (protocol) params.set('protocol', protocol);
+    if (since) params.set('since', String(since));
     return request<Alert[]>(`/api/alerts/recent?${params}`);
   },
 
-  getStatsSummary: () =>
-    request<StatsSummary>('/api/stats/summary'),
+  getStatsSummary: (since?: number) =>
+    request<StatsSummary>(`/api/stats/summary${since ? `?since=${since}` : ''}`),
 
-  getTopAttackers: (limit = 10) =>
-    request<TopAttacker[]>(`/api/stats/top-attackers?limit=${limit}`),
+  getTopAttackers: (limit = 10, since?: number) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (since) params.set('since', String(since));
+    return request<TopAttacker[]>(`/api/stats/top-attackers?${params}`);
+  },
 
-  getProtocolDistribution: () =>
-    request<ProtocolDistribution>('/api/stats/protocol-distribution'),
+  getProtocolDistribution: (since?: number) =>
+    request<ProtocolDistribution>(`/api/stats/protocol-distribution${since ? `?since=${since}` : ''}`),
 
-  getAttackTypeDistribution: () =>
-    request<AttackTypeDistribution>('/api/stats/attack-types'),
+  getAttackTypeDistribution: (since?: number) =>
+    request<AttackTypeDistribution>(`/api/stats/attack-types${since ? `?since=${since}` : ''}`),
 
   getSeverityTimeline: (bucketMinutes = 5) =>
     request<SeverityBucket[]>(

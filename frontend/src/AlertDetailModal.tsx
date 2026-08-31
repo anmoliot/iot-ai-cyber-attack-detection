@@ -27,27 +27,26 @@ function AttackIcon({ type }: { type: string }) {
 
 // Gauge bar for anomaly score
 function ScoreGauge({ score, threshold }: { score: number; threshold: number }) {
-  const pct = Math.min(score * 100, 100);
-  const isAbove = score > threshold;
-  const color = score > 0.9
+  const ratio = threshold > 0 ? score / threshold : 0;
+  const visualMaximum = 4;
+  const pct = Math.min((ratio / visualMaximum) * 100, 100);
+  const color = ratio >= 4
     ? 'var(--severity-critical)'
-    : score > 0.7
+    : ratio >= 2
     ? 'var(--severity-high)'
-    : score > 0.5
+    : ratio >= 1.25
     ? 'var(--severity-medium)'
     : 'var(--severity-low)';
-
-  // Threshold marker position as percentage of the gauge
-  const threshPct = Math.min(threshold * 100, 100);
+  const threshPct = (1 / visualMaximum) * 100;
 
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-        <span>0.0</span>
-        <span style={{ color: isAbove ? color : 'var(--text-secondary)', fontWeight: 700 }}>
-          Score: {score.toFixed(4)}
+        <span>0x</span>
+        <span style={{ color, fontWeight: 700 }}>
+          Score: {score.toFixed(4)} ({ratio.toFixed(1)}x threshold)
         </span>
-        <span>1.0+</span>
+        <span>4x+</span>
       </div>
       <div style={{ position: 'relative', height: 10, borderRadius: 5, backgroundColor: 'var(--border-subtle)' }}>
         {/* Fill */}
@@ -57,7 +56,7 @@ function ScoreGauge({ score, threshold }: { score: number; threshold: number }) 
           borderRadius: 5,
           backgroundColor: color,
           transition: 'width 0.5s ease',
-          boxShadow: isAbove ? `0 0 8px ${color}` : 'none',
+          boxShadow: ratio > 1 ? `0 0 8px ${color}` : 'none',
         }} />
         {/* Threshold marker */}
         <div style={{
@@ -140,6 +139,7 @@ function InfoRow({ label, value, mono = false }: { label: string; value: React.R
 
 export function AlertDetailModal({ alert, onClose }: AlertDetailModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Close on Escape
   useEffect(() => {
@@ -148,9 +148,30 @@ export function AlertDetailModal({ alert, onClose }: AlertDetailModalProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  useEffect(() => {
+    if (alert) closeButtonRef.current?.focus();
+  }, [alert]);
+
   // Close on overlay click
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current) onClose();
+  };
+
+  const handleDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return;
+    const focusable = e.currentTarget.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
   };
 
   if (!alert) return null;
@@ -180,6 +201,10 @@ export function AlertDetailModal({ alert, onClose }: AlertDetailModalProps) {
     >
       <div
         className="animate-slide-up"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="alert-detail-title"
+        onKeyDown={handleDialogKeyDown}
         style={{
           width: '100%',
           maxWidth: 560,
@@ -213,7 +238,7 @@ export function AlertDetailModal({ alert, onClose }: AlertDetailModalProps) {
               <AttackIcon type={alert.attack_type} />
             </div>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>{alert.attack_label}</div>
+              <div id="alert-detail-title" style={{ fontSize: 16, fontWeight: 700 }}>{alert.attack_label}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                 Alert ID: <span className="mono" style={{ fontSize: 11 }}>{alert.id}</span>
               </div>
@@ -222,7 +247,9 @@ export function AlertDetailModal({ alert, onClose }: AlertDetailModalProps) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <SeverityBadge severity={alert.severity} />
             <button
+              ref={closeButtonRef}
               onClick={onClose}
+              aria-label="Close alert details"
               style={{
                 background: 'transparent',
                 border: '1px solid var(--border-default)',
