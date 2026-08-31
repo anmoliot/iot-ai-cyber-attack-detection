@@ -1,26 +1,34 @@
 # Architecture
 
-## Components
-
-1. IoT devices or traffic generator produce LAN/Wi-Fi traffic.
-2. Gateway node captures packets using Scapy or tcpdump.
-3. Flow generator groups packets into network flows.
-4. Feature builder converts flows into the exact ML feature vector.
-5. Preprocessing applies scaling and encoding compatible with training.
-6. Inference engine loads `model.pkl` and predicts traffic class.
-7. Alert engine writes alerts to CSV.
-8. Response engine can prepare firewall block commands.
-9. Dashboard reads CSV logs and displays recent detections.
-
-## Data Flow
+## Runtime paths
 
 ```text
-Packet -> Flow -> Feature Vector -> Scaler -> Model -> Alert -> CSV/Dashboard
+Live host traffic
+  -> Scapy packet capture
+  -> 19 live packet/flow features
+  -> NumPy scaler + autoencoder
+  -> anomaly score and threshold
+  -> heuristic alert label and calibrated severity
+  -> SQLite + WebSocket
+  -> React SOC dashboard
+
+Held-out Edge-IIoT test record
+  -> exact 60 named dataset features
+  -> saved sklearn binary or attack-type pipeline
+  -> prediction API
+  -> supervised-model verification panel
 ```
 
-## Engineering Notes
+## Services
 
-- Keep packet capture, feature generation, inference, response, and logging separate.
-- Do not hard-code model feature names in packet sniffer code.
-- Use `models/features.json` as the single source of truth for live inference feature order.
-- Use CSV logging for simple academic review and reproducibility.
+- `python-backend/main.py`: FastAPI endpoints, lifecycle, WebSocket fan-out, and model loading.
+- `python-backend/ml_engine.py`: lightweight live anomaly engine.
+- `python-backend/edge_iiot_model.py`: validates and runs the 60-feature binary Edge-IIoT pipeline.
+- `python-backend/edge_iiot_attack_type_model.py`: validates and runs the 15-class Edge-IIoT pipeline.
+- `python-backend/kitsune_model.py`: validates and runs the 116-feature Kitsune classifier.
+- `python-backend/database.py`: SQLite persistence for alert records and training state.
+- `frontend`: React/Vite SOC dashboard and supervised demonstration controls.
+
+## Boundary that must be preserved
+
+Scapy's current live feature set is not schema-compatible with the supervised training datasets. The project must not label a live alert as a Kitsune or Edge-IIoT model prediction until a compatible live feature extractor is added and validated.

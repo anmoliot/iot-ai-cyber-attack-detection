@@ -18,6 +18,7 @@ Environment variables:
 """
 
 import asyncio
+import json
 import os
 import threading
 
@@ -66,6 +67,9 @@ EDGE_IIOT_MODEL_PATH = os.path.join(
 )
 EDGE_IIOT_ATTACK_TYPE_MODEL_PATH = os.path.join(
     os.path.dirname(__file__), "models", "edge_iiot", "edge_iiot_attack_type_model.joblib"
+)
+EDGE_IIOT_DEMO_SAMPLES_PATH = os.path.join(
+    os.path.dirname(__file__), "demo_data", "edge_iiot_demo_samples.json"
 )
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sentinel.db")
 CORS_ORIGINS = os.getenv(
@@ -436,6 +440,19 @@ async def predict_edge_iiot_attack_type(request: EdgeIIoTPredictionRequest):
         raise HTTPException(status_code=503, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/demo/edge-iiot-samples", tags=["Demo"])
+async def get_edge_iiot_demo_samples():
+    """Return held-out Edge-IIoT records for the supervised-model demonstration."""
+    if not os.path.exists(EDGE_IIOT_DEMO_SAMPLES_PATH):
+        raise HTTPException(status_code=404, detail="Edge-IIoT demo samples are not installed.")
+
+    try:
+        with open(EDGE_IIOT_DEMO_SAMPLES_PATH, encoding="utf-8") as demo_file:
+            return json.load(demo_file)
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=500, detail="Edge-IIoT demo samples are invalid.") from error
 
 
 @app.get("/api/alerts/recent", tags=["Core"])

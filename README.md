@@ -1,76 +1,61 @@
 # IoT AI Cyber Attack Detection & Monitoring
 
-This project is a **Real-Time IoT Network Intrusion Detection System (IDS)** with a machine-learning-powered backend and a React-based Security Operations Center (SOC) dashboard.
+SentinelAI is a local IoT intrusion-detection demonstration with two deliberately separate paths:
 
-**This document serves as a comprehensive context guide for both human developers and AI coding agents.**
+- **Live monitoring:** Scapy captures host traffic and a lightweight NumPy autoencoder flags anomalous packets.
+- **Supervised validation:** trained Kitsune and Edge-IIoT classifiers accept feature records matching their training schemas. The dashboard includes a repeatable Edge-IIoT held-out-test demo.
 
----
+## What is implemented
 
-## 1. System Architecture
+- FastAPI backend, WebSocket alert stream, SQLite alert history, and React SOC dashboard.
+- Live Scapy capture with a grace period, autoencoder training, anomaly scoring, and severity classification.
+- Persisted supervised artifacts loaded at startup when installed locally:
+  - Kitsune Random Forest: 116-feature binary classifier.
+  - Edge-IIoT binary classifier: 60-feature benign/attack decision.
+  - Edge-IIoT attack-type classifier: 15-class attribution.
+- Edge-IIoT dashboard demo using correctly classified records from the held-out Kaggle test split.
+- Docker configuration for local deployment; raw packet capture requires the appropriate host privileges.
 
-The project is strictly divided into two distinct services:
+## Important scope
 
-### Backend: Python / FastAPI (`/python-backend`)
-- **Framework**: `FastAPI` (for REST and WebSockets), `uvicorn` (server).
-- **Network Sniffing**: Uses `scapy` running in a background thread to intercept live network packets on the host machine.
-- **Machine Learning Engine (`ml_engine.py`)**:
-  - An unsupervised **Autoencoder** built entirely from scratch using `numpy` (no PyTorch/TensorFlow dependencies).
-  - Extracts 9 numerical features from packets (e.g., protocol type, payload length, TCP flags).
-  - **Grace Period**: Starts in an `UNTRAINED` state. It buffers `min_train_samples` (default: 500) packets before training itself (`TRAINING`) and setting an anomaly threshold (97th percentile of reconstruction errors).
-  - **Inference**: Once `READY`, every new packet is scored. If the reconstruction error exceeds the threshold, it triggers an anomaly alert.
-- **API & WebSockets (`main.py`)**:
-  - `GET /api/status`: Returns ML engine state and uptime.
-  - `GET /api/alerts/recent`: Returns the last 200 alerts stored in memory.
-  - `WS /ws/alerts`: A raw WebSocket endpoint that broadcasts alerts to clients the moment the ML engine detects them.
+The supervised models do **not** yet classify raw packets captured by Scapy. They require the exact 60-feature Edge-IIoT or 116-feature Kitsune extraction schemas. Live traffic currently goes through the autoencoder path. A TShark/Kitsune-compatible feature extractor is the next engineering step for live supervised inference.
 
-### Frontend: React / Vite (`/frontend`)
-- **Framework**: React 18, Vite, TypeScript.
-- **Design System**: Premium SOC aesthetic, strict dark mode (`#0a0e14` base), glassmorphism. UI tokens are centrally defined in `src/tokens.css`.
-- **State & Real-Time Binding**:
-  - Uses a custom hook `useAlertStream.ts` to manage the WebSocket connection with exponential backoff for resilience.
-  - Uses `api.ts` for standard REST calls.
-- **Components**:
-  - `DashboardShell.tsx`: The main layout wrapper.
-  - `StatusPanel.tsx`: Displays live engine metrics.
-  - `AnomalyTrendChart.tsx`: Uses `recharts` to plot the last 50 anomaly scores against the dynamic threshold.
-  - `AlertFeed.tsx`: An animated table displaying real-time attacks.
+There is no automated firewall blocking. The application records and displays alerts; response automation remains intentionally out of scope for the current demonstration.
 
-*Note: There is an old `/backend` directory containing Java/Spring Boot scaffolding. This is legacy/deprecated and should be ignored.*
+## Evaluation summary
 
----
+| Model | Dataset/task | Hold-out result |
+| --- | --- | --- |
+| Edge-IIoT binary | 49,301 rows, 60 features | Accuracy 1.0000, macro F1 1.0000 |
+| Edge-IIoT attack type | 15 classes, 60 features | Accuracy 0.9894, macro F1 0.9760 |
 
-## 2. Running the Application Locally
+These are random row-level hold-out results. Related rows from the same capture can occur in train and test sets, so they demonstrate the training pipeline but are not cross-capture generalisation estimates. See [docs/evaluation.md](docs/evaluation.md).
 
-To start the environment, you must run both servers:
+## Run locally
 
-**Start Backend**:
-```bash
+### Backend
+
+```powershell
 cd python-backend
 pip install -r requirements.txt
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-**Start Frontend**:
-```bash
+### Frontend
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
-Navigate to `http://localhost:5173`. The basic auth lock screen password is `admin123`.
 
----
+Open `http://127.0.0.1:5173`. The default local password is `admin123`.
 
-## 3. Future Roadmap (For Agents)
+## Demonstration flow
 
-If you are an agent tasked with improving this repository, refer to this prioritized roadmap of planned improvements:
+1. Open the dashboard and confirm all three persisted supervised models show `READY`.
+2. Run the binary and attack-type classifiers in **Supervised model verification**.
+3. Explain that the inputs are held-out Edge-IIoT test records, not live Scapy traffic.
+4. Use the live monitor, charts, and alert table separately to demonstrate real host packet capture and anomaly detection.
 
-1. **Model Persistence**: Update `ml_engine.py` to save the trained Autoencoder weights (`W1`, `b1`, `W2`, `b2`, `threshold`) to disk (e.g., `model.npz`). Load them on startup to avoid retraining on every boot.
-2. **Database Integration**: Remove the in-memory `recent_alerts` list in `main.py`. Integrate `SQLAlchemy` with SQLite/PostgreSQL to persist alerts securely, enabling historical querying.
-3. **Advanced Analytics**: Add endpoints to aggregate alerts by Protocol (TCP/UDP/ICMP) or Source IP. Update the React frontend to display these as Pie Charts or Bar Charts.
-4. **JWT Authentication**: Replace the hardcoded `admin123` lock screen with a real JWT authentication flow via FastAPI. Protect the WebSocket connection.
-5. **Dockerization**: Create a `Dockerfile` for the backend, a `Dockerfile` for the frontend, and a `docker-compose.yml` to spin up the entire stack seamlessly.
-
-## 4. Agent Context Constraints
-- Do not add React/Vite build steps to the Python backend; keep the two repositories decoupled.
-- When styling the frontend, avoid Tailwind classes unless explicitly requested; stick to the vanilla CSS variables defined in `tokens.css`.
-- The ML engine must remain lightweight. Do not introduce heavy dependencies like TensorFlow unless absolutely necessary for a new feature.
+For preparation and speaking points, see [docs/wednesday-demo.md](docs/wednesday-demo.md).
